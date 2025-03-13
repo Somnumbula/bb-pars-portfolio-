@@ -1,0 +1,53 @@
+from pybit.unified_trading import HTTP
+import openpyxl
+from openpyxl.styles import Font
+from collections import defaultdict
+
+BYBIT_API_KEY = "9X8RkfKRh0MVfQfmXq"
+BYBIT_API_SECRET = "6btsK85rcuri5zkN6KcW4MdegnJhGt0EHxzS"
+TESTNET = False 
+
+session = HTTP(
+    api_key=BYBIT_API_KEY,
+    api_secret=BYBIT_API_SECRET,
+    testnet=TESTNET,
+)
+
+response = session.get_transaction_log(
+    accountType="UNIFIED",
+    category="spot",
+    currency="USDT",
+)
+
+if response.get('retCode') == 0 and 'result' in response and 'list' in response['result']:
+    transactions = response['result']['list']
+    symbol_changes = defaultdict(float)
+
+    for transaction in transactions:
+        if 'symbol' in transaction and 'change' in transaction:
+            change_value = float(transaction['change'])
+            if change_value < 0:
+                symbol = transaction['symbol'].replace('USDT', '')
+                symbol_changes[symbol] += abs(change_value)
+
+    print("Combined matches:")
+    for symbol, change in symbol_changes.items():
+        print(f"symbol: {symbol}, change: {change}")
+
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+
+    headers = ['Symbol', 'Вложено USDT']
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.font = Font(bold=True)
+        
+    for row_num, (symbol, change) in enumerate(symbol_changes.items(), 2):
+        ws.cell(row=row_num, column=1, value=symbol)
+        ws.cell(row=row_num, column=2, value=change)
+
+    wb.save('transactions.xlsx')
+    print("Data saved to transactions.xlsx")
+else:
+    print("No transactions found.")
